@@ -15,6 +15,24 @@ def upload_to_path(instance: 'Blog', filename: str) -> str:
     return f'{settings.BLOG_IMAGE_DIR_NAME}/{user_id}-{blog_id}-{filename}'
 
 
+class Tag(models.Model):
+    class Meta:
+        ordering = ('name',)
+
+    id = models.CharField(primary_key=True, max_length=36,
+                          default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=50, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs) -> None:
+        self.slug = slugify(self.name)
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Blog(models.Model):
 
     class Meta:
@@ -52,6 +70,7 @@ class Blog(models.Model):
     applaud_count = models.PositiveIntegerField(default=0)
     author = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name='blog_posts')
+    tags = models.ManyToManyField(Tag, related_name='blogs', blank=True)
 
     def save(self, *args, **kwargs) -> None:
         self.slug = slugify(self.title)

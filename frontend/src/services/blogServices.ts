@@ -51,12 +51,17 @@ class BlogServicesAPI {
     return response.data;
   };
 
-  static getAllBlogs = async (category: string | null, page: number) => {
-    let url: string = "";
-    if (category === "all") {
-      url = `blogs/all/?page=${page}`;
-    } else {
-      url = `blogs/all/?category=${category}&page=${page}`;
+  static getAllBlogs = async (
+    category: string | null,
+    tag: string | null,
+    page: number,
+  ) => {
+    let url: string = `blogs/all/?page=${page}`;
+    if (category && category !== "all") {
+      url += `&category=${category}`;
+    }
+    if (tag) {
+      url += `&tag=${tag}`;
     }
 
     const response = await api.get(url);
@@ -65,6 +70,33 @@ class BlogServicesAPI {
 
   static searchBlog = async (title: string, authToken: string | null) => {
     const response = await api.get(`blogs/search/?title=${title}`, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+    return response.data;
+  };
+
+  static getAllTags = async () => {
+    const response = await api.get("blogs/tags/");
+    return response.data;
+  };
+
+  static createTag = async (name: string, authToken: string | null) => {
+    const response = await api.post(
+      "blogs/tags/create/",
+      { name },
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      },
+    );
+    return response.data;
+  };
+
+  static deleteTag = async (tagId: string, authToken: string | null) => {
+    const response = await api.delete(`blogs/tags/${tagId}/`, {
       headers: {
         Authorization: `Bearer ${authToken}`,
       },

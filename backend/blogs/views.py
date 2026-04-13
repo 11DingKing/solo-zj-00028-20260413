@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -9,10 +10,68 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import Applaud, Blog, Comment, ReadingList
+from .models import Applaud, Blog, Comment, ReadingList, Tag
 from .pagination import CustomPageNumberPagination
 from .serializers import (ApplaudSerializer, BlogSerializer, CommentSerializer,
-                          ReadingListSerializer)
+                          ReadingListSerializer, TagSerializer)
+
+
+# ------------------------------ Tag views ------------------------------
+class TagListView(APIView):
+    def get(self, request: Request) -> Response:
+        tags = Tag.objects.annotate(blog_count=Count('blogs')).order_by('-blog_count')
+        tag_serializer = TagSerializer(tags, many=True)
+        result = []
+        for tag, tag_data in zip(tags, tag_serializer.data):
+            tag_data['blog_count'] = tag.blog_count
+            result.append(tag_data)
+        return Response(data=result, status=status.HTTP_200_OK)
+
+
+class TagCreateView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        tag_serializer = TagSerializer(data=request.data)
+        if tag_serializer.is_valid(raise_exception=True):
+            tag_serializer.save()
+            return Response(data={'message': 'Tag created successfully', 'tag': tag_serializer.data}, status=status.HTTP_201_CREATED)
+        return Response(data={'message': tag_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TagDetailView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, tag_id: uuid) -> Response:
+        try:
+            tag = Tag.objects.get(pk=tag_id)
+            tag_serializer = TagSerializer(instance=tag)
+            return Response(data=tag_serializer.data, status=status.HTTP_200_OK)
+        except Tag.DoesNotExist:
+            return Response(data={'message': 'Tag does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request: Request, tag_id: uuid) -> Response:
+        try:
+            tag = Tag.objects.get(pk=tag_id)
+            tag_serializer = TagSerializer(instance=tag, data=request.data, partial=True)
+            if tag_serializer.is_valid(raise_exception=True):
+                tag_serializer.save()
+                return Response(data={'message': 'Tag updated successfully', 'tag': tag_serializer.data}, status=status.HTTP_200_OK)
+            return Response(data=tag_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Tag.DoesNotExist:
+            return Response(data={'message': 'Tag does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request: Request, tag_id: uuid) -> Response:
+        try:
+            tag = Tag.objects.get(pk=tag_id)
+            if tag.blogs.exists():
+                return Response(data={'message': 'Cannot delete tag: it is still used by some blogs'}, status=status.HTTP_400_BAD_REQUEST)
+            tag.delete()
+            return Response(data={'message': 'Tag deleted successfully'}, status=status.HTTP_200_OK)
+        except Tag.DoesNotExist:
+            return Response(data={'message': 'Tag does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
 # ------------------------------ Blog views ------------------------------
@@ -20,11 +79,15 @@ class AllBlogsListView(APIView):
 
     def get(self, request: Request) -> Response:
         category: str = request.query_params.get('category', None)
+        tag_slug: str = request.query_params.get('tag', None)
 
-        if category:
-            blogs = Blog.objects.filter(status='publish', category=category)
-        else:
-            blogs = Blog.objects.filter(status='publish')
+        blogs = Blog.objects.filter(status='publish')
+
+        if category and category != 'all':
+            blogs = blogs.filter(category=category)
+
+        if tag_slug:
+            blogs = blogs.filter(tags__slug=tag_slug)
 
         total = blogs.count()
         paginator = CustomPageNumberPagination()
@@ -56,6 +119,15 @@ class BlogPostView(APIView):
     def post(self, request: Request) -> Response:
         data = request.data.copy()
         data['author'] = str(request.user.id)
+
+        tag_ids = request.data.getlist('tag_ids') if hasattr(request.data, 'getlist') else request.data.get('tag_ids', [])
+        if tag_ids and isinstance(tag_ids, str):
+            import json
+            try:
+                tag_ids = json.loads(tag_ids)
+            except:
+                tag_ids = []
+        data['tag_ids'] = tag_ids
 
         blog_serializer = BlogSerializer(data=data)
         if blog_serializer.is_valid(raise_exception=True):
@@ -108,8 +180,19 @@ class BlogDetailView(APIView):
             if blog.author.id != request.user.id:
                 return Response(data={'message': 'You are unauthorized to update the requested blog'}, status=status.HTTP_401_UNAUTHORIZED)
 
+            data = request.data.copy()
+            tag_ids = request.data.getlist('tag_ids') if hasattr(request.data, 'getlist') else request.data.get('tag_ids', None)
+            if tag_ids is not None:
+                if isinstance(tag_ids, str):
+                    import json
+                    try:
+                        tag_ids = json.loads(tag_ids)
+                    except:
+                        tag_ids = []
+                data['tag_ids'] = tag_ids
+
             blog_serializer = BlogSerializer(
-                instance=blog, data=request.data, partial=True)
+                instance=blog, data=data, partial=True)
             if blog_serializer.is_valid(raise_exception=True):
                 blog_serializer.save()
                 return Response(data={'message': 'Blog updated successfully', 'blog': blog_serializer.data}, status=status.HTTP_200_OK)

@@ -3,8 +3,10 @@ import ReactPaginate from "react-paginate";
 import { ClipLoader } from "react-spinners";
 import { ErrorMessage } from "../../components/ErrorMessage";
 import { useGetAllBlogsQuery } from "../../hooks/blogs/useGetAllBlogsQuery";
+import { useGetAllTagsQuery } from "../../hooks/tags/useGetAllTagsQuery";
 import { BlogCard } from "./components/BlogCard";
 import { CategorySelection } from "./components/CategorySelection";
+import { TagSelection } from "./components/TagSelection";
 
 export const ViewAllBlogs = (): JSX.Element => {
   const [catIndex, setCatIndex] = useState<any>({
@@ -12,12 +14,23 @@ export const ViewAllBlogs = (): JSX.Element => {
     cat: "all",
   });
 
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
 
-  const { data: blogs, isError: isErrorFetchBlog, isLoading: isLoadingFetchBlog } = useGetAllBlogsQuery(catIndex.cat, page);
+  const { data: tags, isLoading: isLoadingTags } = useGetAllTagsQuery();
+  const {
+    data: blogs,
+    isError: isErrorFetchBlog,
+    isLoading: isLoadingFetchBlog,
+  } = useGetAllBlogsQuery(catIndex.cat, selectedTag, page);
 
   const pageChangeOnChange = (selectedItem: { selected: number }) => {
     setPage(selectedItem.selected + 1);
+  };
+
+  const handleTagSelect = (tagSlug: string | null) => {
+    setSelectedTag(tagSlug);
+    setPage(1);
   };
 
   if (isErrorFetchBlog) {
@@ -28,9 +41,23 @@ export const ViewAllBlogs = (): JSX.Element => {
     <div className="mx-auto max-w-[1080px] mt-20">
       <CategorySelection catIndex={catIndex} setCatIndex={setCatIndex} />
 
+      {!isLoadingTags && tags && tags.length > 0 && (
+        <TagSelection
+          tags={tags}
+          selectedTag={selectedTag}
+          onTagSelect={handleTagSelect}
+        />
+      )}
+
       {isLoadingFetchBlog ? (
         <div className="flex flex-col justify-center items-center">
-          <ClipLoader color="#000000" loading={isLoadingFetchBlog} size={25} aria-label="loading-spinner" data-testid="loader" />
+          <ClipLoader
+            color="#000000"
+            loading={isLoadingFetchBlog}
+            size={25}
+            aria-label="loading-spinner"
+            data-testid="loader"
+          />
         </div>
       ) : (
         blogs?.results?.result?.map((blogData: any, index: number) => (
@@ -50,9 +77,15 @@ export const ViewAllBlogs = (): JSX.Element => {
           pageRangeDisplayed={6}
           onPageChange={pageChangeOnChange}
           containerClassName={"rounded-md flex justify-center gap-2"}
-          pageClassName={"border-[0.8px] border-slate-300 text-purple-400 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md hover:bg-purple-200"}
-          previousClassName={"text-purple-500 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md border-[0.8px] border-slate-300 hover:bg-purple-200"}
-          nextClassName={"text-purple-500 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md border-[0.8px] border-slate-300 hover:bg-purple-200"}
+          pageClassName={
+            "border-[0.8px] border-slate-300 text-purple-400 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md hover:bg-purple-200"
+          }
+          previousClassName={
+            "text-purple-500 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md border-[0.8px] border-slate-300 hover:bg-purple-200"
+          }
+          nextClassName={
+            "text-purple-500 font-bold w-[1.5rem] h-[1.5rem] text-center rounded-md border-[0.8px] border-slate-300 hover:bg-purple-200"
+          }
           breakClassName={"text-purple-500"}
           activeClassName={"bg-purple-200"}
         />

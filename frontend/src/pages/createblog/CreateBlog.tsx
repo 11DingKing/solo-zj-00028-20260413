@@ -4,22 +4,37 @@ import "react-quill/dist/quill.snow.css";
 import { useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { toast } from "react-toastify";
+import { TagInput } from "../../components/TagInput";
 import { usePostBlogMutation } from "../../hooks/blogs/usePostBlogMutation";
+import { useGetAllTagsQuery } from "../../hooks/tags/useGetAllTagsQuery";
+import { BlogServicesAPI } from "../../services/blogServices";
 import { categoryData } from "../../utils/categories";
 import { reactQuillModules } from "../../utils/constants";
 import { SelectCoverImage } from "./components/SelectCoverImage";
+
+interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export const CreateBlog = (): JSX.Element => {
   const authToken = localStorage.getItem("authToken");
   const [isLoadingPublish, setIsLoadingPublish] = useState<boolean>(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(false);
-  const [previewCoverImage, setPreviewCoverImage] = useState<string | null>(null);
+  const [previewCoverImage, setPreviewCoverImage] = useState<string | null>(
+    null,
+  );
   const [title, setTitle] = useState<string>("");
   const [subtitle, setSubtitle] = useState<string>("");
   const [coverImage, setCoverImage] = useState<File | null>();
   const [category, setCategory] = useState<string>("");
   const [content, setContent] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const navigate = useNavigate();
+
+  const { data: availableTags, isLoading: isLoadingTags } =
+    useGetAllTagsQuery();
 
   const { mutate: postBlog } = usePostBlogMutation(
     (_: any) => {
@@ -31,7 +46,7 @@ export const CreateBlog = (): JSX.Element => {
       setIsLoadingPublish(false);
       setIsLoadingDraft(false);
       toast.error("Error in posting blog. Please try again later.");
-    }
+    },
   );
 
   useEffect(() => {
@@ -67,6 +82,16 @@ export const CreateBlog = (): JSX.Element => {
     }
   };
 
+  const handleCreateTag = async (name: string): Promise<Tag | null> => {
+    try {
+      const response = await BlogServicesAPI.createTag(name, authToken);
+      return response.tag;
+    } catch (error) {
+      toast.error("Failed to create tag");
+      return null;
+    }
+  };
+
   const validateFormData = (): boolean => {
     if (!title || !subtitle || !category) {
       toast.error("All fields are mandatory except the cover-image");
@@ -82,7 +107,10 @@ export const CreateBlog = (): JSX.Element => {
     return true;
   };
 
-  const submit = (e: React.MouseEvent<HTMLButtonElement>, status: string): void => {
+  const submit = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    status: string,
+  ): void => {
     e.preventDefault();
 
     if (validateFormData()) {
@@ -99,6 +127,11 @@ export const CreateBlog = (): JSX.Element => {
       data.append("category", category);
       data.append("content", content);
       data.append("status", status);
+
+      if (selectedTags.length > 0) {
+        const tagIds = selectedTags.map((tag) => tag.id);
+        data.append("tag_ids", JSON.stringify(tagIds));
+      }
 
       postBlog({ data, authToken });
     }
@@ -138,18 +171,55 @@ export const CreateBlog = (): JSX.Element => {
         {/** Categories */}
         <div className="flex justify-center gap-8 flex-wrap">
           {categoryData.map((cat, index) => (
-            <div key={index} className="flex flex-col gap-2 font-semibold hover:bg-purple-100 rounded-sm p-1">
-              <label>{cat.label.charAt(0).toUpperCase() + cat.label.slice(1)}</label>
-              <input type="radio" name={cat.name} value={cat.value} checked={category === cat.value} onChange={categoryOnChange} />
+            <div
+              key={index}
+              className="flex flex-col gap-2 font-semibold hover:bg-purple-100 rounded-sm p-1"
+            >
+              <label>
+                {cat.label.charAt(0).toUpperCase() + cat.label.slice(1)}
+              </label>
+              <input
+                type="radio"
+                name={cat.name}
+                value={cat.value}
+                checked={category === cat.value}
+                onChange={categoryOnChange}
+              />
             </div>
           ))}
         </div>
 
-        <SelectCoverImage previewImage={previewCoverImage} onChangeHandler={coverImageOnChange} />
+        {/** Tags */}
+        <div className="flex flex-col items-start p-2 mt-4">
+          <label className="mb-2 font-semibold">Tags</label>
+          {isLoadingTags ? (
+            <div className="w-full p-2 text-center text-sm text-gray-500">
+              Loading tags...
+            </div>
+          ) : (
+            <TagInput
+              availableTags={availableTags || []}
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+              onCreateTag={handleCreateTag}
+            />
+          )}
+        </div>
+
+        <SelectCoverImage
+          previewImage={previewCoverImage}
+          onChangeHandler={coverImageOnChange}
+        />
 
         {/** Editor */}
         <div className="w-full p-2">
-          <ReactQuill theme="snow" modules={reactQuillModules} onChange={setContent} placeholder="Start writing :) ..." preserveWhitespace />
+          <ReactQuill
+            theme="snow"
+            modules={reactQuillModules}
+            onChange={setContent}
+            placeholder="Start writing :) ..."
+            preserveWhitespace
+          />
         </div>
 
         {/** Draft/publish buttons */}
@@ -162,7 +232,17 @@ export const CreateBlog = (): JSX.Element => {
               }}
               className="rounded-md w-1/2 border-[1.5px] border-darkpurple hover:scale-105 duration-300"
             >
-              {isLoadingDraft ? <ClipLoader color="#000000" loading={isLoadingDraft} size={15} aria-label="loading-spinner" data-testid="loader" /> : "Draft"}
+              {isLoadingDraft ? (
+                <ClipLoader
+                  color="#000000"
+                  loading={isLoadingDraft}
+                  size={15}
+                  aria-label="loading-spinner"
+                  data-testid="loader"
+                />
+              ) : (
+                "Draft"
+              )}
             </button>
             <button
               type="button"
@@ -171,7 +251,17 @@ export const CreateBlog = (): JSX.Element => {
               }}
               className="rounded-md w-1/2 bg-darkpurple border-[1.9px] border-darkpurple hover:bg-lightpurple hover:scale-105 duration-300"
             >
-              {isLoadingPublish ? <ClipLoader color="#000000" loading={isLoadingPublish} size={15} aria-label="loading-spinner" data-testid="loader" /> : "Publish"}
+              {isLoadingPublish ? (
+                <ClipLoader
+                  color="#000000"
+                  loading={isLoadingPublish}
+                  size={15}
+                  aria-label="loading-spinner"
+                  data-testid="loader"
+                />
+              ) : (
+                "Publish"
+              )}
             </button>
           </div>
         </div>

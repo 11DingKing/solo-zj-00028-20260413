@@ -3,24 +3,39 @@ import ReactQuill from "react-quill";
 import { useNavigate, useParams } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { toast } from "react-toastify";
+import { TagInput } from "../../components/TagInput";
 import { useEditBlogMutation } from "../../hooks/blogs/useEditBlogMutation";
 import { useGetBlogQuery } from "../../hooks/blogs/useGetBlogQuery";
+import { useGetAllTagsQuery } from "../../hooks/tags/useGetAllTagsQuery";
+import { BlogServicesAPI } from "../../services/blogServices";
 import { categoryData } from "../../utils/categories";
 import { reactQuillModules } from "../../utils/constants";
 import { SelectCoverImage } from "./components/SelectCoverImage";
 
+interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export const EditBlog = (): JSX.Element => {
   const authToken = localStorage.getItem("authToken");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [previewCoverImage, setPreviewCoverImage] = useState<string | null>(null);
+  const [previewCoverImage, setPreviewCoverImage] = useState<string | null>(
+    null,
+  );
   const [title, setTitle] = useState<string>("");
   const [subtitle, setSubtitle] = useState<string>("");
   const [coverImage, setCoverImage] = useState<File | null>();
   const [category, setCategory] = useState<string>("");
   const [content, setContent] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 
   const { blogId } = useParams() as any;
   const navigate = useNavigate();
+
+  const { data: availableTags, isLoading: isLoadingTags } =
+    useGetAllTagsQuery();
 
   const { data: _ } = useGetBlogQuery(
     blogId,
@@ -30,10 +45,13 @@ export const EditBlog = (): JSX.Element => {
       setSubtitle(data?.subtitle);
       setCategory(data?.category);
       setContent(data?.content);
+      if (data?.tags) {
+        setSelectedTags(data.tags);
+      }
     },
     (_: any) => {
       toast.error("Error in fetching blog. Please try again later.");
-    }
+    },
   );
 
   const { mutate: editBlog } = useEditBlogMutation(
@@ -44,7 +62,7 @@ export const EditBlog = (): JSX.Element => {
     (_: any) => {
       setIsLoading(false);
       toast.error("Error in editing blog. Please try again later.");
-    }
+    },
   );
 
   useEffect(() => {
@@ -80,6 +98,16 @@ export const EditBlog = (): JSX.Element => {
     }
   };
 
+  const handleCreateTag = async (name: string): Promise<Tag | null> => {
+    try {
+      const response = await BlogServicesAPI.createTag(name, authToken);
+      return response.tag;
+    } catch (error) {
+      toast.error("Failed to create tag");
+      return null;
+    }
+  };
+
   const validateFormData = (): boolean => {
     if (!title || !subtitle || !category) {
       toast.error("All fields are mandatory except the cover-image");
@@ -95,7 +123,10 @@ export const EditBlog = (): JSX.Element => {
     return true;
   };
 
-  const submit = (e: React.MouseEvent<HTMLButtonElement>, status: string): void => {
+  const submit = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    status: string,
+  ): void => {
     e.preventDefault();
 
     if (validateFormData()) {
@@ -112,6 +143,9 @@ export const EditBlog = (): JSX.Element => {
       data.append("category", category);
       data.append("content", content);
       data.append("status", status);
+
+      const tagIds = selectedTags.map((tag) => tag.id);
+      data.append("tag_ids", JSON.stringify(tagIds));
 
       editBlog({ blogId, data, authToken });
     }
@@ -155,16 +189,49 @@ export const EditBlog = (): JSX.Element => {
           {categoryData.map((cat, index) => (
             <div key={index} className="flex flex-col gap-2 font-bold">
               <label>{cat.label}</label>
-              <input type="radio" name={cat.name} value={cat.value} checked={category === cat.value} onChange={categoryOnChange} />
+              <input
+                type="radio"
+                name={cat.name}
+                value={cat.value}
+                checked={category === cat.value}
+                onChange={categoryOnChange}
+              />
             </div>
           ))}
         </div>
 
-        <SelectCoverImage previewImage={previewCoverImage} onChangeHandler={coverImageOnChange} />
+        {/** Tags */}
+        <div className="flex flex-col items-start p-2 mt-4">
+          <label className="mb-2 font-semibold">Tags</label>
+          {isLoadingTags ? (
+            <div className="w-full p-2 text-center text-sm text-gray-500">
+              Loading tags...
+            </div>
+          ) : (
+            <TagInput
+              availableTags={availableTags || []}
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+              onCreateTag={handleCreateTag}
+            />
+          )}
+        </div>
+
+        <SelectCoverImage
+          previewImage={previewCoverImage}
+          onChangeHandler={coverImageOnChange}
+        />
 
         {/** Editor */}
         <div className="w-full p-2">
-          <ReactQuill theme="snow" modules={reactQuillModules} value={content} onChange={setContent} placeholder="Start writing :) ..." preserveWhitespace />
+          <ReactQuill
+            theme="snow"
+            modules={reactQuillModules}
+            value={content}
+            onChange={setContent}
+            placeholder="Start writing :) ..."
+            preserveWhitespace
+          />
         </div>
 
         {/** Draft/publish buttons */}
@@ -177,7 +244,17 @@ export const EditBlog = (): JSX.Element => {
               }}
               className="rounded-md w-1/2 border-[1.5px] border-darkpurple hover:scale-105 duration-300"
             >
-              {isLoading ? <ClipLoader color="#000000" loading={isLoading} size={15} aria-label="loading-spinner" data-testid="loader" /> : "Draft"}
+              {isLoading ? (
+                <ClipLoader
+                  color="#000000"
+                  loading={isLoading}
+                  size={15}
+                  aria-label="loading-spinner"
+                  data-testid="loader"
+                />
+              ) : (
+                "Draft"
+              )}
             </button>
             <button
               type="button"
@@ -186,7 +263,17 @@ export const EditBlog = (): JSX.Element => {
               }}
               className="rounded-md w-1/2 bg-darkpurple border-[1.9px] border-darkpurple hover:bg-lightpurple hover:scale-105 duration-300"
             >
-              {isLoading ? <ClipLoader color="#000000" loading={isLoading} size={15} aria-label="loading-spinner" data-testid="loader" /> : "Publish"}
+              {isLoading ? (
+                <ClipLoader
+                  color="#000000"
+                  loading={isLoading}
+                  size={15}
+                  aria-label="loading-spinner"
+                  data-testid="loader"
+                />
+              ) : (
+                "Publish"
+              )}
             </button>
           </div>
         </div>

@@ -4,10 +4,16 @@ from .views import (AllBlogsListView, ApplaudDetailView, ApplaudPostView,
                     BlogDetailView, BlogPostView, CommentDetailView,
                     CommentPostView, CommentsAggregateView, CommentsListView,
                     ReadingListDetailView, ReadingListListView,
-                    ReadingListPostView, SearchBlogView, UserBlogsListView)
+                    ReadingListPostView, SearchBlogView, TagCreateView,
+                    TagDetailView, TagListView, UserBlogsListView)
 
 
 urlpatterns = [
+    # Tag urls
+    path('tags/', TagListView.as_view(), name='all_tags'),
+    path('tags/create/', TagCreateView.as_view(), name='create_tag'),
+    path('tags/<uuid:tag_id>/', TagDetailView.as_view(), name='tag_detail'),
+    
     # Blog urls
     path('all/', AllBlogsListView.as_view(), name='all_blogs'),
     path('blogpost/', BlogPostView.as_view(), name='post_a_blog'),
