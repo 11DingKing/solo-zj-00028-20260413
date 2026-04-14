@@ -1,4 +1,5 @@
-from rest_framework.serializers import CharField, ImageField, ModelSerializer
+from django.conf import settings
+from rest_framework.serializers import CharField, ImageField, ModelSerializer, ReadOnlyField, SerializerMethodField
 
 from .models import Applaud, Blog, Comment, ReadingList, Tag
 
@@ -7,6 +8,7 @@ class TagSerializer(ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'slug']
+        read_only_fields = ['slug']
 
 
 class BlogSerializer(ModelSerializer):
@@ -15,11 +17,24 @@ class BlogSerializer(ModelSerializer):
     author_profile_image = ImageField(
         source='author.profile_image', read_only=True)
     tags = TagSerializer(many=True, read_only=True)
+    cover_image = SerializerMethodField()
 
     class Meta:
         model = Blog
         fields = ['id', 'title', 'slug', 'subtitle', 'cover_image', 'content', 'category', 'created_at',
                   'status', 'applaud_count', 'author', 'author_username', 'author_profile_image', 'tags']
+
+    def get_cover_image(self, obj):
+        if obj.cover_image:
+            if hasattr(obj.cover_image, 'url'):
+                url = obj.cover_image.url
+                if url.startswith('http'):
+                    return url
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(url)
+                return settings.MEDIA_URL + url.lstrip('/') if url else None
+        return None
 
     def create(self, validated_data):
         tag_ids = self.context.get('tag_ids', [])

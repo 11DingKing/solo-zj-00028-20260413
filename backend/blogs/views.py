@@ -92,7 +92,7 @@ class AllBlogsListView(APIView):
 
         total = blogs.count()
         paginator = CustomPageNumberPagination()
-        return paginator.generate_response(blogs, BlogSerializer, request, total)
+        return paginator.generate_response(blogs, BlogSerializer, request, total, context={'request': request})
 
 
 class SearchBlogView(APIView):
@@ -107,7 +107,7 @@ class SearchBlogView(APIView):
             return Response(data={'message': 'query_param "title" is not provided'}, status=status.HTTP_400_BAD_REQUEST)
         
         filtered_blogs = Blog.objects.filter(title__icontains=search_term)
-        blog_serializer = BlogSerializer(instance=filtered_blogs, many=True)
+        blog_serializer = BlogSerializer(instance=filtered_blogs, many=True, context={'request': request})
         return Response(data=blog_serializer.data, status=status.HTTP_200_OK)
     
 
@@ -137,7 +137,7 @@ class BlogPostView(APIView):
             else:
                 tag_ids = tag_ids_raw
 
-        blog_serializer = BlogSerializer(data=data, context={'tag_ids': tag_ids})
+        blog_serializer = BlogSerializer(data=data, context={'request': request, 'tag_ids': tag_ids})
         if blog_serializer.is_valid(raise_exception=True):
             blog_serializer.save()
             return Response(data={'message': 'Blog created successfully', 'blog': blog_serializer.data}, status=status.HTTP_201_CREATED)
@@ -157,7 +157,7 @@ class UserBlogsListView(APIView):
             return Response(data={'message': 'Query param `status` is not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         blogs = Blog.objects.filter(author=request.user.id, status=blog_status)
-        blog_serializer = BlogSerializer(instance=blogs, many=True)
+        blog_serializer = BlogSerializer(instance=blogs, many=True, context={'request': request})
         return Response(data=blog_serializer.data, status=status.HTTP_200_OK)
 
 
@@ -170,7 +170,7 @@ class BlogDetailView(APIView):
     def get(self, request: Request, blog_id: uuid) -> Response:
         try:
             blog = Blog.objects.get(pk=blog_id)
-            blog_serializer = BlogSerializer(instance=blog)
+            blog_serializer = BlogSerializer(instance=blog, context={'request': request})
             return Response(data=blog_serializer.data, status=status.HTTP_200_OK)
         except Blog.DoesNotExist:
             return Response(data={'message': 'Blog does not exist'}, status=status.HTTP_404_NOT_FOUND)
@@ -200,7 +200,7 @@ class BlogDetailView(APIView):
                 else:
                     tag_ids = tag_ids_raw
 
-            blog_serializer = BlogSerializer(instance=blog, data=data, partial=True, context={'tag_ids': tag_ids})
+            blog_serializer = BlogSerializer(instance=blog, data=data, partial=True, context={'request': request, 'tag_ids': tag_ids})
             if blog_serializer.is_valid(raise_exception=True):
                 blog_serializer.save()
                 return Response(data={'message': 'Blog updated successfully', 'blog': blog_serializer.data}, status=status.HTTP_200_OK)
@@ -328,7 +328,7 @@ class ApplaudPostView(APIView):
                     applaud_serializer.save()
 
             blog.save()
-            blog_serializer = BlogSerializer(instance=blog)
+            blog_serializer = BlogSerializer(instance=blog, context={'request': request})
             return Response(data=blog_serializer.data, status=status.HTTP_200_OK)
 
         except Blog.DoesNotExist:
@@ -395,7 +395,7 @@ class ReadingListListView(APIView):
         try:
             user = get_user_model().objects.get(pk=request.user.id)
             reading_list = ReadingList.objects.filter(user=request.user.id)
-            reading_list_serializer = ReadingListSerializer(reading_list, many=True)
+            reading_list_serializer = ReadingListSerializer(reading_list, many=True, context={'request': request})
             return Response(data=reading_list_serializer.data, status=status.HTTP_200_OK)
 
         except get_user_model().DoesNotExist:
