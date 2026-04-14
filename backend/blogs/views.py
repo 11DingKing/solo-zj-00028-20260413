@@ -118,18 +118,25 @@ class BlogPostView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request: Request) -> Response:
+        import json
+        
         data = request.data.copy()
         data['author'] = str(request.user.id)
 
         tag_ids = []
+        
         if hasattr(request.data, 'getlist'):
             tag_ids_raw = request.data.getlist('tag_ids')
+            if tag_ids_raw and len(tag_ids_raw) > 0:
+                first_item = tag_ids_raw[0]
+                if isinstance(first_item, str):
+                    try:
+                        tag_ids = json.loads(first_item)
+                    except:
+                        tag_ids = []
         else:
             tag_ids_raw = request.data.get('tag_ids', [])
-        
-        if tag_ids_raw:
             if isinstance(tag_ids_raw, str):
-                import json
                 try:
                     tag_ids = json.loads(tag_ids_raw)
                 except:
@@ -176,6 +183,8 @@ class BlogDetailView(APIView):
             return Response(data={'message': 'Blog does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request: Request, blog_id: uuid) -> Response:
+        import json
+        
         try:
             blog = Blog.objects.get(pk=blog_id)
 
@@ -187,18 +196,23 @@ class BlogDetailView(APIView):
             tag_ids = None
             if hasattr(request.data, 'getlist'):
                 tag_ids_raw = request.data.getlist('tag_ids')
+                if tag_ids_raw and len(tag_ids_raw) > 0:
+                    first_item = tag_ids_raw[0]
+                    if isinstance(first_item, str):
+                        try:
+                            tag_ids = json.loads(first_item)
+                        except:
+                            tag_ids = []
             else:
                 tag_ids_raw = request.data.get('tag_ids', None)
-            
-            if tag_ids_raw is not None:
-                if isinstance(tag_ids_raw, str):
-                    import json
-                    try:
-                        tag_ids = json.loads(tag_ids_raw)
-                    except:
-                        tag_ids = []
-                else:
-                    tag_ids = tag_ids_raw
+                if tag_ids_raw is not None:
+                    if isinstance(tag_ids_raw, str):
+                        try:
+                            tag_ids = json.loads(tag_ids_raw)
+                        except:
+                            tag_ids = []
+                    else:
+                        tag_ids = tag_ids_raw
 
             blog_serializer = BlogSerializer(instance=blog, data=data, partial=True, context={'request': request, 'tag_ids': tag_ids})
             if blog_serializer.is_valid(raise_exception=True):
