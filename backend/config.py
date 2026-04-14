@@ -1,11 +1,11 @@
 # AWS-RDS or Local machine - MySql
-DB_NAME = ''
-DB_USER = ''
-DB_PASSWORD = ''
-DB_PORT = 0
-DB_HOST = ''
+DB_NAME = 'chronicles'
+DB_USER = 'chronicles_user'
+DB_PASSWORD = 'chronicles_pass'
+DB_PORT = 3306
+DB_HOST = 'db'
 
-# AWS-S3
+# AWS-S3 (disabled for local dev)
 AWS_S3_ACCESS_KEY_ID = ''
 AWS_S3_SECRET_ACCESS_KEY = ''
 AWS_STORAGE_BUCKET_NAME = ''

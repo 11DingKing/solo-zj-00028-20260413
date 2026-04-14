@@ -128,8 +128,8 @@ BLOG_IMAGE_DIR_NAME = 'blogcoverimages'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# AWS-S3
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# AWS-S3 (use local storage for dev)
+DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 AWS_S3_ACCESS_KEY_ID = config.AWS_S3_ACCESS_KEY_ID
 AWS_S3_SECRET_ACCESS_KEY = config.AWS_S3_SECRET_ACCESS_KEY
 AWS_STORAGE_BUCKET_NAME = config.AWS_STORAGE_BUCKET_NAME
