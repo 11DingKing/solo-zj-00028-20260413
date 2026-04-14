@@ -1,14 +1,13 @@
 version: "1.0"
 services:
  db:
-  image: mysql:8.0
+  image: mariadb:10.6
   container_name: mysql_db
   environment:
    MYSQL_DATABASE: chronicles
    MYSQL_USER: chronicles_user
    MYSQL_PASSWORD: chronicles_pass
    MYSQL_ROOT_PASSWORD: root_pass
-  command: --default-authentication-plugin=mysql_native_password
   ports:
    - "3306:3306"
   healthcheck:

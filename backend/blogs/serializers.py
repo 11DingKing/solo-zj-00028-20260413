@@ -1,4 +1,4 @@
-from rest_framework.serializers import CharField, ImageField, SlugField, RelatedField, ModelSerializer, ListField, PrimaryKeyRelatedField
+from rest_framework.serializers import CharField, ImageField, ModelSerializer
 
 from .models import Applaud, Blog, Comment, ReadingList, Tag
 
@@ -15,26 +15,22 @@ class BlogSerializer(ModelSerializer):
     author_profile_image = ImageField(
         source='author.profile_image', read_only=True)
     tags = TagSerializer(many=True, read_only=True)
-    tag_ids = ListField(
-        child=PrimaryKeyRelatedField(queryset=Tag.objects.all()),
-        write_only=True,
-        required=False
-    )
 
     class Meta:
         model = Blog
         fields = ['id', 'title', 'slug', 'subtitle', 'cover_image', 'content', 'category', 'created_at',
-                  'status', 'applaud_count', 'author', 'author_username', 'author_profile_image', 'tags', 'tag_ids']
+                  'status', 'applaud_count', 'author', 'author_username', 'author_profile_image', 'tags']
 
     def create(self, validated_data):
-        tag_ids = validated_data.pop('tag_ids', [])
+        tag_ids = self.context.get('tag_ids', [])
         blog = Blog.objects.create(**validated_data)
         if tag_ids:
-            blog.tags.set(tag_ids)
+            tags = Tag.objects.filter(id__in=tag_ids)
+            blog.tags.set(tags)
         return blog
 
     def update(self, instance, validated_data):
-        tag_ids = validated_data.pop('tag_ids', None)
+        tag_ids = self.context.get('tag_ids', None)
         
         for key, data in validated_data.items():
             if key == 'cover_image':
@@ -44,7 +40,8 @@ class BlogSerializer(ModelSerializer):
         instance.save()
         
         if tag_ids is not None:
-            instance.tags.set(tag_ids)
+            tags = Tag.objects.filter(id__in=tag_ids)
+            instance.tags.set(tags)
 
         return instance
 

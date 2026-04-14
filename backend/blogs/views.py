@@ -16,15 +16,17 @@ from .serializers import (ApplaudSerializer, BlogSerializer, CommentSerializer,
                           ReadingListSerializer, TagSerializer)
 
 
-# ------------------------------ Tag views ------------------------------
 class TagListView(APIView):
     def get(self, request: Request) -> Response:
         tags = Tag.objects.annotate(blog_count=Count('blogs')).order_by('-blog_count')
-        tag_serializer = TagSerializer(tags, many=True)
         result = []
-        for tag, tag_data in zip(tags, tag_serializer.data):
-            tag_data['blog_count'] = tag.blog_count
-            result.append(tag_data)
+        for tag in tags:
+            result.append({
+                'id': str(tag.id),
+                'name': tag.name,
+                'slug': tag.slug,
+                'blog_count': tag.blog_count
+            })
         return Response(data=result, status=status.HTTP_200_OK)
 
 
@@ -74,12 +76,11 @@ class TagDetailView(APIView):
             return Response(data={'message': 'Tag does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# ------------------------------ Blog views ------------------------------
 class AllBlogsListView(APIView):
 
     def get(self, request: Request) -> Response:
-        category: str = request.query_params.get('category', None)
-        tag_slug: str = request.query_params.get('tag', None)
+        category = request.query_params.get('category', None)
+        tag_slug = request.query_params.get('tag', None)
 
         blogs = Blog.objects.filter(status='publish')
 
@@ -100,7 +101,7 @@ class SearchBlogView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        search_term: str = request.query_params.get('title', None)
+        search_term = request.query_params.get('title', None)
 
         if not search_term:
             return Response(data={'message': 'query_param "title" is not provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -120,16 +121,23 @@ class BlogPostView(APIView):
         data = request.data.copy()
         data['author'] = str(request.user.id)
 
-        tag_ids = request.data.getlist('tag_ids') if hasattr(request.data, 'getlist') else request.data.get('tag_ids', [])
-        if tag_ids and isinstance(tag_ids, str):
-            import json
-            try:
-                tag_ids = json.loads(tag_ids)
-            except:
-                tag_ids = []
-        data['tag_ids'] = tag_ids
+        tag_ids = []
+        if hasattr(request.data, 'getlist'):
+            tag_ids_raw = request.data.getlist('tag_ids')
+        else:
+            tag_ids_raw = request.data.get('tag_ids', [])
+        
+        if tag_ids_raw:
+            if isinstance(tag_ids_raw, str):
+                import json
+                try:
+                    tag_ids = json.loads(tag_ids_raw)
+                except:
+                    tag_ids = []
+            else:
+                tag_ids = tag_ids_raw
 
-        blog_serializer = BlogSerializer(data=data)
+        blog_serializer = BlogSerializer(data=data, context={'tag_ids': tag_ids})
         if blog_serializer.is_valid(raise_exception=True):
             blog_serializer.save()
             return Response(data={'message': 'Blog created successfully', 'blog': blog_serializer.data}, status=status.HTTP_201_CREATED)
@@ -148,13 +156,7 @@ class UserBlogsListView(APIView):
         if not blog_status:
             return Response(data={'message': 'Query param `status` is not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if blog_status == 'draft':
-            blogs = Blog.objects.filter(
-                author=request.user.id, status=blog_status)
-        elif blog_status == 'publish':
-            blogs = Blog.objects.filter(
-                author=request.user.id, status=blog_status)
-
+        blogs = Blog.objects.filter(author=request.user.id, status=blog_status)
         blog_serializer = BlogSerializer(instance=blogs, many=True)
         return Response(data=blog_serializer.data, status=status.HTTP_200_OK)
 
@@ -181,18 +183,24 @@ class BlogDetailView(APIView):
                 return Response(data={'message': 'You are unauthorized to update the requested blog'}, status=status.HTTP_401_UNAUTHORIZED)
 
             data = request.data.copy()
-            tag_ids = request.data.getlist('tag_ids') if hasattr(request.data, 'getlist') else request.data.get('tag_ids', None)
-            if tag_ids is not None:
-                if isinstance(tag_ids, str):
+            
+            tag_ids = None
+            if hasattr(request.data, 'getlist'):
+                tag_ids_raw = request.data.getlist('tag_ids')
+            else:
+                tag_ids_raw = request.data.get('tag_ids', None)
+            
+            if tag_ids_raw is not None:
+                if isinstance(tag_ids_raw, str):
                     import json
                     try:
-                        tag_ids = json.loads(tag_ids)
+                        tag_ids = json.loads(tag_ids_raw)
                     except:
                         tag_ids = []
-                data['tag_ids'] = tag_ids
+                else:
+                    tag_ids = tag_ids_raw
 
-            blog_serializer = BlogSerializer(
-                instance=blog, data=data, partial=True)
+            blog_serializer = BlogSerializer(instance=blog, data=data, partial=True, context={'tag_ids': tag_ids})
             if blog_serializer.is_valid(raise_exception=True):
                 blog_serializer.save()
                 return Response(data={'message': 'Blog updated successfully', 'blog': blog_serializer.data}, status=status.HTTP_200_OK)
@@ -214,7 +222,6 @@ class BlogDetailView(APIView):
             return Response(data={'message': 'Blog does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# ------------------------------ Comment views ------------------------------
 class CommentsListView(APIView):
 
     authentication_classes = [JWTAuthentication]
@@ -272,8 +279,7 @@ class CommentDetailView(APIView):
             if request.user.id != comment.user.id:
                 return Response(data={'message': 'You are unauthorized to update the requested comment'}, status=status.HTTP_401_UNAUTHORIZED)
 
-            comment_serializer = CommentSerializer(
-                instance=comment, data=request.data, partial=True)
+            comment_serializer = CommentSerializer(instance=comment, data=request.data, partial=True)
             if comment_serializer.is_valid(raise_exception=True):
                 comment_serializer.save()
                 return Response(data={'message': 'Comment updated successfully'}, status=status.HTTP_200_OK)
@@ -298,7 +304,6 @@ class CommentDetailView(APIView):
                 return Response(data={'message': 'Comment does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# ------------------------------ Applaud views ------------------------------
 class ApplaudPostView(APIView):
 
     authentication_classes = [JWTAuthentication]
@@ -307,12 +312,10 @@ class ApplaudPostView(APIView):
     def post(self, request: Request, blog_id: uuid) -> Response:
         try:
             blog = Blog.objects.get(pk=blog_id)
-            user_applauded = Applaud.objects.filter(
-                blog=blog_id, user=request.user.id).exists()
+            user_applauded = Applaud.objects.filter(blog=blog_id, user=request.user.id).exists()
             if user_applauded:
                 blog.applaud_count -= 1
-                Applaud.objects.filter(
-                    blog=blog_id, user=request.user.id).delete()
+                Applaud.objects.filter(blog=blog_id, user=request.user.id).delete()
             else:
                 blog.applaud_count += 1
                 data = {
@@ -344,7 +347,6 @@ class ApplaudDetailView(APIView):
         return Response(data={'message': 'false'}, status=status.HTTP_200_OK)
 
 
-# ------------------------------ Reading-list related views ------------------------------
 class ReadingListPostView(APIView):
 
     authentication_classes = [JWTAuthentication]
@@ -353,11 +355,9 @@ class ReadingListPostView(APIView):
     def post(self, request: Request, blog_id: uuid) -> Response:
         try:
             blog = Blog.objects.get(pk=blog_id)
-            user_saved = ReadingList.objects.filter(
-                blog=blog_id, user=request.user.id).exists()
+            user_saved = ReadingList.objects.filter(blog=blog_id, user=request.user.id).exists()
             if user_saved:
-                ReadingList.objects.filter(
-                    blog=blog_id, user=request.user.id).delete()
+                ReadingList.objects.filter(blog=blog_id, user=request.user.id).delete()
                 return Response(data={'message': 'Blog removed from the reading-list successfully'}, status=status.HTTP_200_OK)
             else:
                 data = {
@@ -395,8 +395,7 @@ class ReadingListListView(APIView):
         try:
             user = get_user_model().objects.get(pk=request.user.id)
             reading_list = ReadingList.objects.filter(user=request.user.id)
-            reading_list_serializer = ReadingListSerializer(
-                reading_list, many=True)
+            reading_list_serializer = ReadingListSerializer(reading_list, many=True)
             return Response(data=reading_list_serializer.data, status=status.HTTP_200_OK)
 
         except get_user_model().DoesNotExist:
