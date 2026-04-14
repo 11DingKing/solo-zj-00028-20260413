@@ -17,14 +17,15 @@ class BlogSerializer(ModelSerializer):
     author_profile_image = ImageField(
         source='author.profile_image', read_only=True)
     tags = TagSerializer(many=True, read_only=True)
-    cover_image = SerializerMethodField()
+    cover_image_url = SerializerMethodField()
 
     class Meta:
         model = Blog
-        fields = ['id', 'title', 'slug', 'subtitle', 'cover_image', 'content', 'category', 'created_at',
+        fields = ['id', 'title', 'slug', 'subtitle', 'cover_image', 'cover_image_url', 'content', 'category', 'created_at',
                   'status', 'applaud_count', 'author', 'author_username', 'author_profile_image', 'tags']
+        read_only_fields = ['cover_image_url']
 
-    def get_cover_image(self, obj):
+    def get_cover_image_url(self, obj):
         if obj.cover_image:
             if hasattr(obj.cover_image, 'url'):
                 url = obj.cover_image.url

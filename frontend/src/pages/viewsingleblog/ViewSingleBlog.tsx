@@ -15,8 +15,27 @@ import { useGetBlogQuery } from "../../hooks/blogs/useGetBlogQuery";
 import { useGetTotalCommentsQuery } from "../../hooks/comments/useGetTotalCommentsQuery";
 import { useSaveBlogMutation } from "../../hooks/readinglist/useSaveBlogMutation";
 import { useWhetherUserSavedBlogQuery } from "../../hooks/readinglist/useWhetherUserSavedBlogQuery";
+import { BASEURL } from "../../utils/constants";
 import { timeDiff } from "../../utils/relativeTime";
 import { Comments } from "./components/Comments";
+
+const getImageUrl = (imageData: any): string => {
+  if (!imageData) {
+    return "https://picsum.photos/800/400";
+  }
+  
+  if (typeof imageData === "string") {
+    if (imageData.startsWith("http")) {
+      return imageData;
+    }
+    if (imageData.startsWith("/")) {
+      return BASEURL + imageData;
+    }
+    return BASEURL + "/" + imageData;
+  }
+  
+  return "https://picsum.photos/800/400";
+};
 
 export const ViewSingleBlog = (): JSX.Element => {
   const authToken = localStorage.getItem("authToken");
@@ -72,6 +91,8 @@ export const ViewSingleBlog = (): JSX.Element => {
     setOpenComments(true);
   };
 
+  const coverImageUrl = blogData?.cover_image_url || blogData?.cover_image;
+
   return (
     <div className="mx-auto max-w-[1080px] mt-20 w-full">
       {isLoadingFetchBlog ? (
@@ -82,13 +103,13 @@ export const ViewSingleBlog = (): JSX.Element => {
         <>
           {/** Cover image */}
           <div className="w-full sm:h-[18rem] p-2">
-            <img src={blogData?.cover_image} alt="coverimage" className=" w-full h-[10rem] sm:h-full rounded-md object-cover" />
+            <img src={getImageUrl(coverImageUrl)} alt="coverimage" className=" w-full h-[10rem] sm:h-full rounded-md object-cover" />
           </div>
 
           <div className="flex justify-center p-2 items-center">
             {/** Author info & date */}
             <div className="flex justify-center items-center pl-2">
-              <img src={blogData?.["author_profile_image"]} alt="author-profileimage" className="w-7 h-7 sm:w-10 sm:h-10 rounded-full" />
+              <img src={getImageUrl(blogData?.["author_profile_image"])} alt="author-profileimage" className="w-7 h-7 sm:w-10 sm:h-10 rounded-full" />
               <p className=" text-sm p-2">@ {blogData?.["author_username"] + " • "}</p>
               <p className="text-center text-[0.5rem] sm:text-[0.8rem]">{timeDiff(new Date(blogData.created_at).valueOf())}</p>
             </div>

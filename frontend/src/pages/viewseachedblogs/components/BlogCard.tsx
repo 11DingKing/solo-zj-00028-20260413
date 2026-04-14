@@ -1,7 +1,26 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 import { HiFire } from "react-icons/hi";
 import { useNavigate } from "react-router-dom";
+import { BASEURL } from "../../../utils/constants";
 import { timeDiff } from "../../../utils/relativeTime";
+
+const getImageUrl = (imageData: any): string => {
+  if (!imageData) {
+    return "https://picsum.photos/400/300";
+  }
+  
+  if (typeof imageData === "string") {
+    if (imageData.startsWith("http")) {
+      return imageData;
+    }
+    if (imageData.startsWith("/")) {
+      return BASEURL + imageData;
+    }
+    return BASEURL + "/" + imageData;
+  }
+  
+  return "https://picsum.photos/400/300";
+};
 
 export const BlogCard = ({ blogData }: any): JSX.Element => {
   const navigate = useNavigate();
@@ -10,16 +29,18 @@ export const BlogCard = ({ blogData }: any): JSX.Element => {
     navigate(`/blog/view/${blogData.id}/${blogData.slug}`);
   };
 
+  const coverImageUrl = blogData.cover_image_url || blogData.cover_image;
+
   return (
     <div className="w-[95%] sm:w-full mt-4 flex justify-between items-center p-4 bg-white hover:scale-105 duration-300 rounded-md border-[1.5px] border-slate-200 shadow-md shadow-slate-300">
       {/** Cover image */}
-      <img src={blogData["cover_image"]} alt="cover-image" className="w-[30%] h-[11.25rem] rounded-md object-cover" />
+      <img src={getImageUrl(coverImageUrl)} alt="cover-image" className="w-[30%] h-[11.25rem] rounded-md object-cover" />
 
       {/** Blog details */}
       <div className="w-[70%] h-[11.25rem] relative">
         {/** Author info */}
         <div className="flex justify-start items-center pl-2">
-          <img src={blogData["author_profile_image"]} alt="author-profile-image" className="w-7 h-7 sm:w-10 sm:h-10 rounded-full" />
+          <img src={getImageUrl(blogData["author_profile_image"])} alt="author-profile-image" className="w-7 h-7 sm:w-10 sm:h-10 rounded-full" />
           <p className=" text-sm p-2">@ {blogData["author_username"]}</p>
         </div>
 
